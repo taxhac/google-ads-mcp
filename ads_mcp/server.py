@@ -16,11 +16,6 @@
 
 from ads_mcp.coordinator import mcp
 
-# The following imports are necessary to register the resources with the `mcp`
-# object, even though they are not directly used in this file.
-# Tools are loaded dynamically via reflection in coordinator.py.
-# The `# noqa: F401` comment tells the linter to ignore the "unused import"
-# warning.
 from ads_mcp.resources import (
     discovery,
     metrics,
@@ -28,19 +23,26 @@ from ads_mcp.resources import (
     segments,
 )  # noqa: F401
 
-
 import os
+import uvicorn
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+
+class ApiKeyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        expected = os.environ.get("MCP_API_KEY")
+        if expected:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header != f"Bearer {expected}":
+                return Response("Unauthorized", status_code=401)
+        return await call_next(request)
 
 
 def run_server() -> None:
-    _CLIENT_ID = os.environ.get("GOOGLE_ADS_MCP_OAUTH_CLIENT_ID")
-    _CLIENT_SECRET = os.environ.get("GOOGLE_ADS_MCP_OAUTH_CLIENT_SECRET")
     port = int(os.environ.get("PORT", "8080"))
-
-    if _CLIENT_ID and _CLIENT_SECRET:
-        mcp.run(transport="streamable-http", port=port, host="0.0.0.0")
-    else:
-        mcp.run()
+    app = mcp.http_app(transport="streamable-http", middleware=[ApiKeyMiddleware])
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
