@@ -25,23 +25,11 @@ from ads_mcp.resources import (
 
 import os
 import uvicorn
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-
-
-class ApiKeyMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        expected = os.environ.get("MCP_API_KEY")
-        if expected:
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header != f"Bearer {expected}":
-                return Response("Unauthorized", status_code=401)
-        return await call_next(request)
 
 
 def run_server() -> None:
     port = int(os.environ.get("PORT", "8080"))
-    app = mcp.http_app(transport="streamable-http", middleware=[ApiKeyMiddleware])
+    app = mcp.http_app(transport="streamable-http")
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 
